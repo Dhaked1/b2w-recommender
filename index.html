@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Video Recommendation Prototype — b2w.tv</title>
+  <style>
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;margin:0;background:#f6f8fb;color:#111}
+    header{background:#0b5fff;color:white;padding:20px}
+    .container{max-width:880px;margin:28px auto;padding:18px;background:white;border-radius:10px;box-shadow:0 6px 20px rgba(20,30,60,0.08)}
+    h1{margin:0 0 8px;font-size:20px}
+    p.lead{margin:0 0 18px;color:#4b5563}
+    textarea{width:100%;min-height:90px;padding:10px;border-radius:8px;border:1px solid #e6e9ef;resize:vertical;font-size:14px}
+    .controls{display:flex;gap:8px;margin-top:12px;align-items:center}
+    button{background:#0b5fff;color:white;border:none;padding:10px 14px;border-radius:8px;cursor:pointer}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    .result-list{margin-top:18px;display:grid;gap:12px}
+    .card{display:flex;gap:12px;padding:12px;border-radius:8px;border:1px solid #e9eef8;align-items:center}
+    .thumb{width:120px;height:70px;background:#eaeffb;border-radius:6px;flex-shrink:0;object-fit:cover}
+    .meta{flex:1}
+    .meta h3{margin:0;font-size:15px}
+    .meta p{margin:6px 0 0;color:#475569;font-size:13px}
+    .tag{display:inline-block;background:#eef2ff;color:#0b5fff;padding:4px 8px;border-radius:999px;font-size:12px;margin-top:8px}
+    footer{margin-top:18px;color:#6b7280;font-size:13px}
+    .small{font-size:12px;color:#6b7280}
+  </style>
+</head>
+<body>
+  <header>
+    <div style="max-width:880px;margin:0 auto">
+      <strong>Broadcast2World — Prototype</strong>
+    </div>
+  </header>
+
+  <main class="container" role="main" aria-live="polite">
+    <h1>Quick Video Recommendation Prototype</h1>
+    <p class="lead">Type the user's video requirement (e.g., "explainer for SaaS, 60s, upbeat"). Click <strong>Recommend</strong>.</p>
+
+    <label for="req" class="small">Describe video requirement</label>
+    <textarea id="req" placeholder="e.g. 'I want a 60s explainer video for a SaaS onboarding page — friendly, upbeat, 2D animation'"></textarea>
+
+    <div class="controls">
+      <button id="btn">Recommend</button>
+      <div id="status" class="small" style="margin-left:6px"></div>
+    </div>
+
+    <div id="results" class="result-list" aria-live="polite" style="margin-top:18px"></div>
+
+    <footer>
+      <p class="small">Prototype: Uses local mapping + demo thumbnail. To use Google AI Studio, swap the `getRecommendationsFromAI()` implementation (see inline comments).</p>
+    </footer>
+  </main>
+
+  <script>
+    // --- Demo dataset (replace with real b2w.tv links) ---
+    const VIDEO_DB = [
+      {
+        id: "explainer_saas_1",
+        title: "SaaS Product Explainer — 60s",
+        description: "2D explainer for SaaS onboarding. Clean narration + motion graphics.",
+        category: "explainer",
+        tags: ["saas","explainer","2d","60s"],
+        url: "https://b2w.tv/saas-explainer-60",
+        thumb: "/mnt/data/prototype assessment.jpg"
+      },
+      {
+        id: "brand_corporate_1",
+        title: "Corporate Brand Video — 90s",
+        description: "Corporate branding video with live-action + motion overlays.",
+        category: "brand",
+        tags: ["corporate","brand","live-action","90s"],
+        url: "https://b2w.tv/corporate-brand-demo",
+        thumb: "/mnt/data/prototype assessment.jpg"
+      },
+      {
+        id: "product_demo_1",
+        title: "Product Demo — Screen-record style",
+        description: "Screencast-based product walkthrough with annotations.",
+        category: "demo",
+        tags: ["demo","screencast","tutorial"],
+        url: "https://b2w.tv/product-demo",
+        thumb: "/mnt/data/prototype assessment.jpg"
+      },
+      {
+        id: "animation_social_1",
+        title: "Social Short — Motion Graphic",
+        description: "15-30s engaging motion-graphics for social channels.",
+        category: "social",
+        tags: ["social","motion","short","15s"],
+        url: "https://b2w.tv/social-motion-short",
+        thumb: "/mnt/data/prototype assessment.jpg"
+      }
+    ];
+
+    const btn = document.getElementById('btn');
+    const reqBox = document.getElementById('req');
+    const results = document.getElementById('results');
+    const status = document.getElementById('status');
+
+    btn.addEventListener('click', async () => {
+      const query = reqBox.value.trim();
+      results.innerHTML = '';
+      if (!query) {
+        status.textContent = 'Please type a requirement.';
+        return;
+      }
+      btn.disabled = true;
+      status.textContent = 'Analyzing...';
+
+      // Try AI route first (if implemented). For prototype we call fallback.
+      try {
+        // Uncomment and implement getRecommendationsFromAI when you wire up Google AI Studio.
+        // const aiRec = await getRecommendationsFromAI(query);
+        // if (aiRec && aiRec.length) { renderRecommendations(aiRec); }
+        // else use fallback:
+        const recs = await fallbackRecommend(query);
+        renderRecommendations(recs);
+      } catch (err) {
+        console.error(err);
+        status.textContent = 'Error — see console. Showing fallback results.';
+        const recs = await fallbackRecommend(query);
+        renderRecommendations(recs);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    function renderRecommendations(list) {
+      status.textContent = '';
+      if (!list || list.length === 0) {
+        results.innerHTML = '<div class="small">No suitable videos found. Try a different description.</div>';
+        return;
+      }
+      results.innerHTML = '';
+      list.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const img = document.createElement('img');
+        img.className = 'thumb';
+        img.src = item.thumb;
+        img.alt = item.title;
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.innerHTML = `<h3><a href="${item.url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${item.title}</a></h3>
+                          <p>${item.description}</p>
+                          <div class="tag">${item.category}</div>`;
+        card.appendChild(img);
+        card.appendChild(meta);
+        results.appendChild(card);
+      });
+    }
+
+    // --- Simple fallback recommender (keyword matching + tag scoring) ---
+    async function fallbackRecommend(text) {
+      const t = text.toLowerCase();
+      // weighting
+      const scores = VIDEO_DB.map(v => {
+        let s = 0;
+        // match tags
+        v.tags.forEach(tag => { if (t.includes(tag)) s += 3; });
+        // match category words
+        if (t.includes(v.category)) s += 2;
+        // match generic words
+        if (t.includes('explainer')) s += 4;
+        if (t.includes('demo') || t.includes('walkthrough')) s += 3;
+        if (t.includes('brand') || t.includes('corporate')) s += 3;
+        if (t.includes('social') || t.includes('instagram') || t.includes('tiktok')) s += 3;
+        if (t.match(/\b(15s|30s|60s|90s|120s)\b/)) s += 1;
+        // small fuzzy similarity: common words overlap
+        const words = t.split(/\W+/).filter(Boolean);
+        const overlap = words.filter(w => v.title.toLowerCase().includes(w)).length;
+        s += overlap;
+        return {id: v.id, score: s};
+      });
+      // sort
+      scores.sort((a,b) => b.score - a.score);
+      // return top 3 positive-scored items
+      const chosen = scores.filter(s=>s.score>0).slice(0,3).map(s=> VIDEO_DB.find(v=>v.id===s.id));
+      // if none matched, return the most generic items
+      if (chosen.length===0) return VIDEO_DB.slice(0,2);
+      return chosen;
+    }
+
+    // --- Where to put Google AI Studio integration ---
+    /*
+      Example function skeleton — DO NOT RUN as-is.
+      To use Google AI Studio Generative APIs you typically:
+        1. Create a Google Cloud project and enable the Generative AI API.
+        2. Create an API key or OAuth credentials and keep the key secret (don't embed in client JS).
+        3. For security, call the Generative API from a small server/proxy that holds your key.
+           If you must call from client, ensure you use a secure proxy or short-lived tokens.
+        4. Send a prompt that maps user's text -> categories/keywords, or directly requests recommended b2w links.
+    */
+
+    async function getRecommendationsFromAI(userText) {
+      // PSEUDO-CODE / TEMPLATE:
+      // const resp = await fetch('https://your-proxy.example.com/generate', {
+      //   method:'POST',
+      //   headers:{'Content-Type':'application/json'},
+      //   body: JSON.stringify({prompt: `User requirement: "${userText}". Map to best b2w categories or 3 recommended video types+example URLs.`})
+      // });
+      // const data = await resp.json();
+      // // Expect data to be an array of objects: [{title,description,url,category,thumb}, ...]
+      // return data;
+      //
+      // NOTE: we intentionally leave this blank in the client prototype. Implement on server or developer console when ready.
+      return null;
+    }
+
+    // optional: demo auto-fill
+    reqBox.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter' && e.shiftKey) {
+        e.preventDefault();
+        btn.click();
+      }
+    });
+  </script>
+</body>
+</html>
