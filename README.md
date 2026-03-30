@@ -64,7 +64,7 @@ root/
 │── index.html        # Full UI + script + dataset
 │── README.md         
 
-Live Demo: https://dhaked1.github.io/b2w-recommender/
+Live Demo: https://sulekha5.github.io/b2w-recommender/
 Any LLM that maps requirements → recommended videos
 
 🚀 The prototype currently always falls back to local logic.
